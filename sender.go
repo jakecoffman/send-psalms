@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
 	"log"
 	"net/smtp"
@@ -22,9 +22,12 @@ type EmailUser struct {
 var password string
 var bible map[string]map[string]map[string]string
 
+const URL = `<html><body><a href="http://www.esvbible.org/%s+%s">ESV</a>`
+const PSALMS = "Psalms"
+
 func main() {
 	if len(os.Args) < 3 {
-		fmt.Println("Enter next psalm to send and smtp password")
+		fmt.Println("Usage: %q [next chapter to send] [smtp password]")
 		return
 	}
 	password = os.Args[2]
@@ -36,15 +39,24 @@ func main() {
 	}
 	log.Println("Will send Psalm", chapterNum, "next")
 
-	file, err := os.Open("bibles/ESV/ESV.json")
+	// populate initial list of "tos"
+	tos, err := readLines("send-to.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	json.NewDecoder(file).Decode(&bible)
 
 	onCron := func() {
-		subject, text := getEmailText(chapterStr)
-		sendMail(subject, text)
+		text := fmt.Sprintf(URL, PSALMS, chapterStr)
+		subject := fmt.Sprintf("%s %s", PSALMS, chapterStr)
+
+		// see if there are updated tos
+		newTos, err := readLines("send-to.txt")
+		if err != nil {
+			log.Println("Warning: can't find send-to.txt")
+		} else {
+			tos = newTos
+		}
+		sendMail(subject, text, tos)
 		log.Println("Sent Psalms", chapterStr)
 		chapterNum++
 		if chapterNum > 150 {
@@ -53,28 +65,17 @@ func main() {
 		chapterStr = strconv.Itoa(chapterNum)
 	}
 
+	onCron()
+
 	c := cron.New()
 	c.AddFunc("0 0 7 * * *", onCron)
-	c.AddFunc("0 0 14 * * *", onCron)
+	c.AddFunc("0 0 19 * * *", onCron)
 	c.Start()
 
 	select {} // sleep forever
 }
 
-func getEmailText(chapterStr string) (string, string) {
-	psalms := bible["Psalms"]
-	chapter := psalms[chapterStr]
-	text := []string{}
-	for i := 0; i < len(chapter); i++ {
-		verse := strconv.Itoa(i + 1)
-		text = append(text, chapter[verse])
-	}
-
-	subject := fmt.Sprintf("Psalms %v", chapterStr)
-	return subject, strings.Join(text, " ")
-}
-
-func sendMail(subject string, content string) {
+func sendMail(subject, content string, tos []string) {
 	emailUser := &EmailUser{
 		"no-reply@coffshire.com",
 		password,
@@ -94,8 +95,9 @@ func sendMail(subject string, content string) {
 		emailUser.Username,
 		[]string{"jake@jakecoffman.com"},
 		[]byte("From: no-reply@coffshire.com\r\n"+
-			"To: jake@jakecoffman.com\r\n"+
-			"Subject: "+subject+
+			"To: "+strings.Join(tos, ",")+"\r\n"+
+			"Subject: "+subject+"\r\n"+
+			"MIME-version: 1.0;\nContent-Type: text/html; charset=\"UTF-8\";"+
 			"\r\n\r\n"+
 			content),
 	)
@@ -103,4 +105,19 @@ func sendMail(subject string, content string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func readLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines, scanner.Err()
 }

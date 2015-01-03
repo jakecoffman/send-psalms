@@ -65,8 +65,6 @@ func main() {
 		chapterStr = strconv.Itoa(chapterNum)
 	}
 
-	onCron()
-
 	c := cron.New()
 	c.AddFunc("0 0 7 * * *", onCron)
 	c.AddFunc("0 0 19 * * *", onCron)

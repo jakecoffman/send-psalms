@@ -91,7 +91,7 @@ func sendMail(subject, content string, tos []string) {
 		emailUser.EmailServer+":"+strconv.Itoa(emailUser.Port),
 		auth,
 		emailUser.Username,
-		[]string{"jake@jakecoffman.com"},
+		tos,
 		[]byte("From: no-reply@coffshire.com\r\n"+
 			"To: "+strings.Join(tos, ",")+"\r\n"+
 			"Subject: "+subject+"\r\n"+

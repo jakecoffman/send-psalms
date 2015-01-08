@@ -65,6 +65,7 @@ func main() {
 		chapterStr = strconv.Itoa(chapterNum)
 	}
 
+
 	c := cron.New()
 	c.AddFunc("0 0 7 * * *", onCron)
 	c.AddFunc("0 0 19 * * *", onCron)
@@ -115,7 +116,10 @@ func readLines(path string) ([]string, error) {
 	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		text := strings.TrimSpace(scanner.Text())
+		if text != "" {
+			lines = append(lines, text)
+		}
 	}
 	return lines, scanner.Err()
 }
